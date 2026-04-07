@@ -1,171 +1,160 @@
-# README
+# Vega Star Task 1
 
-## 1. Metadata của ảnh gốc
+## Mục tiêu
+Thực hiện chuẩn hóa ảnh vệ tinh đa phổ từ định dạng 16-bit sang 8-bit để phục vụ trực quan hóa ảnh RGB, đồng thời giữ lại thông tin không gian (georeference).
 
+## 1. Metadata ảnh gốc
 Ảnh đầu vào là ảnh vệ tinh đa phổ với các đặc điểm chính:
 
-* Kích thước: **11543 x 8070 pixels**
-* Số kênh: **8 bands**
-* Kiểu dữ liệu: **UInt16 (16-bit)**
-* Giá trị pixel: **0 → 65535 (2¹⁶)**
-* Định dạng: **GeoTIFF (có thông tin tọa độ - CRS, transform)**
+| Thuộc tính | Giá trị |
+| --- | --- |
+| Kích thước | 11543 x 8070 pixels |
+| Số kênh | 8 bands |
+| Kiểu dữ liệu | UInt16 (16-bit) |
+| Miền giá trị pixel | 0 -> 65535 |
+| Định dạng | GeoTIFF (có CRS, transform) |
 
-Các band phổ bao gồm:
+Các band phổ gồm:
+1. Coastal Blue
+2. Blue
+3. Green I
+4. Green
+5. Yellow
+6. Red
+7. Red Edge
+8. Near Infrared (NIR)
 
-* Coastal Blue
-* Blue
-* Green I
-* Green
-* Yellow
-* Red
-* Red Edge
-* Near Infrared (NIR)
+## 2. Bài toán chuyển đổi 16-bit -> 8-bit
+Ảnh 16-bit có miền giá trị $[0, 65535]$, trong khi ảnh 8-bit có miền $[0, 255]$.
 
----
+Do đó cần ánh xạ:
 
-## 2. Bài toán chuyển đổi 16-bit → 8-bit
-
-Ảnh 16-bit có miền giá trị:
-
-* **0 → 2¹⁶ = 65536**
-
-Trong khi đó ảnh 8-bit có miền giá trị:
-
-* **0 → 2⁸ = 256**
-
-Do đó, để hiển thị hoặc sử dụng cho các tác vụ khác thì phải thực hiện biến đổi
-```
-[0, 65535] → [0, 255]
+```text
+[0, 65535] -> [0, 255]
 ```
 
-Tuy vậy, ta sẽ gặp các trường hợp như sau khi normalization pixel
+Các khó khăn chính khi normalize:
+1. Phân bố pixel không đồng đều.
+2. Có outlier (giá trị cực lớn/cực nhỏ).
+3. Dynamic range giữa các band khác nhau.
 
-* Phân bố pixel không đồng đều
-* Có outlier (giá trị cực lớn/cực nhỏ)
-* Dynamic range bị lệch ví dụ như việc bị lệch range giữa các band là khác nhau như sau:
-	Band 1: Coastal blue (Min: 6970 | Max: 7683) 
-	Band 2: blue (Min: 5728 | Max: 6755) 
-	Band 3: green_i (Min: 4716 | Max: 5948) 
-	Band 4: green (Min: 619 | Max: 12281) 
-	Band 5: yellow (Min: 619 | Max: 12281) 
-	Band 6: red (Min: 619 | Max: 12281) 
-	Band 7: rededge (Min: 619 | Max: 12281) 
-	Band 8: Nir (Min: 619 | Max: 12281)
+Khoảng giá trị quan sát theo band:
 
----
+```text
+Band 1 (Coastal Blue): Min 6970 | Max 7683
+Band 2 (Blue):         Min 5728 | Max 6755
+Band 3 (Green I):      Min 4716 | Max 5948
+Band 4 (Green):        Min 619  | Max 12281
+Band 5 (Yellow):       Min 619  | Max 12281
+Band 6 (Red):          Min 619  | Max 12281
+Band 7 (Red Edge):     Min 619  | Max 12281
+Band 8 (NIR):          Min 619  | Max 12281
+```
 
 ## 3. Phân tích histogram và đặc điểm dữ liệu
 ![Histogram from QGIS](./histogram.jpg)
 
 ![Histogram per band](./image.png)
-Dựa vào biểu đồ histogram:
 
-* Pixel không phân bố đều trên toàn miền 0 → 12000+
-* Mỗi band có một khoảng giá trị tập trung riêng
-* Có **đuôi dài (long tail)** → tồn tại outlier
-* Phần lớn pixel tập trung ở khoảng thấp
+Nhận xét từ histogram:
+1. Pixel không phân bố đều trên toàn miền 0 -> 12000+.
+2. Mỗi band có vùng giá trị tập trung riêng.
+3. Có đuôi dài (long tail), thể hiện sự tồn tại outlier.
+4. Phần lớn pixel tập trung ở vùng giá trị thấp.
 
 ### Boxplot
 ![Box plot for per band](./bplot.png)
-Dựa vào box plot:
-* Ta thấy rằng mỗi band có rất nhiều điểm giá trị pixel nằm ngoài khoảng Q1 và Q3 => Có rất nhiều outlier => Càng chứng tỏ sẽ rất nhạy với kiểu min max
 
-### Nhận xét:
+Nhận xét từ boxplot:
+1. Nhiều điểm nằm ngoài khoảng Q1-Q3 ở hầu hết các band.
+2. Dữ liệu chứa nhiều outlier, rất nhạy với Min-Max scaling cơ bản.
 
-1. **Dynamic range thực tế nhỏ hơn lý thuyết**
+Kết luận dữ liệu:
+1. Dynamic range thực tế nhỏ hơn lý thuyết.
+2. Outlier có thể làm sai lệch phép kéo giãn tương phản.
+3. Các band không đồng nhất, dễ gây lệch màu khi hiển thị RGB.
 
-   * Dù max ~12000 nhưng phần lớn pixel nằm trong khoảng hẹp hơn
+## 4. Phương pháp biến đổi ảnh
 
-2. **Có outlier**
+### 4.1. Hạn chế của Min-Max scaling cơ bản
 
-   * Các giá trị cực lớn (cloud, reflection, noise)
-   * Nếu dùng min-max sẽ bị kéo giãn sai
-
-3. **Các band không đồng nhất**
-
-   * Mỗi band có phân bố khác nhau → dễ gây lệch màu
-
----
-
-## 4. Thử nghiệm với 2 phương pháp biến đổi ảnh dựa vào độ lệch chuẩn và percentile
-
-### Vấn đề với Min-Max Scaling cơ bản
-
-```
+```text
 x' = (x - min) / (max - min)
 ```
 
-**Nhược điểm lớn:**
+Nhược điểm:
+1. Rất nhạy với outlier.
+2. Một vài điểm nhiễu có thể làm phần lớn ảnh bị tối.
+3. Mất chi tiết vùng chính do dynamic range bị kéo giãn không phù hợp.
 
-* Rất nhạy với outlier (pixel cực lớn/nhỏ)
-* Một vài pixel nhiễu làm phần lớn ảnh bị tối
-* Mất chi tiết vùng chính vì dynamic range bị giãn quá
+### 4.2. Standard Deviation Stretching
+Thay vì dùng min/max toàn cục, dùng thống kê trung bình và độ lệch chuẩn:
 
----
-
-### Hai phương pháp được sử dụng
-
-#### **1️⃣ Phương pháp Standard Deviation**
-
-Thay vì dùng min/max toàn cục, sử dụng thống kê:
-
-```
+```text
 mean = trung bình dữ liệu
 std = độ lệch chuẩn
-
----
-
-#### **2️⃣ Phương pháp Percentile**
-
-Giá trị của các band sau khi tính toán như sau:
-	Biến đổi thông qua phương thức: percentile
-	Band 1: Range [6843.0 - 7975.0]
-	Band 2: Range [5577.0 - 7195.0]
-	Band 3: Range [4561.0 - 6793.0]
-	Band 4: Range [3729.0 - 6383.0]
-	Band 5: Range [2503.0 - 5897.0]
-	Band 6: Range [1842.0 - 5447.9]
-	Band 7: Range [1372.0 - 6053.0]
-	Band 8: Range [627.0 - 7095.0]
-
+low = mean - k * std
+high = mean + k * std
 ```
+
+Sau đó clip giá trị về [low, high] trước khi scale về [0, 255].
+
+### 4.3. Percentile Stretching
+Sử dụng ngưỡng phần trăm để loại ảnh hưởng outlier:
+
+```text
 p_low = percentile(0.5%)
 p_high = percentile(99.5%)
 ```
 
-**Tham số:**
-- `STRETCH_METHOD = "percentile"`
-- `PERCENTILES = (0.5, 99.5)` (cắt bỏ 0.5% pixel ở hai đầu)
+Tham số sử dụng:
+1. `STRETCH_METHOD = "percentile"`
+2. `PERCENTILES = (0.5, 99.5)`
 
-## 5. Vấn đề về kích thước ảnh
+Range theo từng band khi áp dụng percentile:
 
-Ảnh có kích thước:
-
+```text
+Band 1: [6843.0 - 7975.0]
+Band 2: [5577.0 - 7195.0]
+Band 3: [4561.0 - 6793.0]
+Band 4: [3729.0 - 6383.0]
+Band 5: [2503.0 - 5897.0]
+Band 6: [1842.0 - 5447.9]
+Band 7: [1372.0 - 6053.0]
+Band 8: [627.0 - 7095.0]
 ```
-(11543, 8070, 8) => Open image trực tiếp thì sẽ crash note book
+
+## 5. Vấn đề kích thước ảnh
+Kích thước ảnh:
+
+```text
+(11543, 8070, 8)
 ```
 
-### => Để đọc được bức ảnh này thì phải đọc theo từng window với các kích thước block nhỏ để tránh gây tràn ram
+Nếu mở toàn bộ ảnh trực tiếp có thể gây crash notebook do thiếu RAM.
 
+Giải pháp: đọc ảnh theo từng window/block nhỏ để xử lý tuần tự.
 
-## 6. Giữ thông tin tọa độ (Georeference) - Lấy đúng thông tin (profile mà thư viện rasterio đọc)
+## 6. Giữ thông tin tọa độ (Georeference)
+Khi ghi ảnh đầu ra, cần giữ nguyên profile đọc từ rasterio (CRS, transform và metadata liên quan) để đảm bảo ảnh sau xử lý vẫn đúng hệ tọa độ.
 
-## 7. Ảnh sau khi biến đổi
-- Ảnh RGB khi sử dụng phương pháp percentile
+## 7. Kết quả ảnh sau biến đổi
+1. Ảnh RGB (percentile):
 [Ảnh RGB](https://drive.google.com/file/d/1xg4L2zrc3KQWLQgJmvqZpEM_cnXaqhN-/view?usp=sharing)
+2. Ảnh TIFF đầu ra:
+[Ảnh TIFF](https://drive.google.com/file/d/1BtU9qb74vcsULC4Y-nMLYs-TzJ1llP5I/view?usp=sharing)
 
-- Ảnh Tif
-[Ảnh RGB](https://drive.google.com/file/d/1BtU9qb74vcsULC4Y-nMLYs-TzJ1llP5I/view?usp=sharing)
+## 8. Đánh giá chất lượng sau biến đổi theo từng band
 
-## 8. Đánh giá ảnh sau khi biến đổi qua từng band:
-Kiểm tra chất lượng ảnh sau biến đổi
-Band 1: PSNR=21.26 dB | SSIM=0.8517 | Entropy=5.88
-Band 2: PSNR=24.06 dB | SSIM=0.7655 | Entropy=5.58
-Band 3: PSNR=17.70 dB | SSIM=0.6717 | Entropy=5.52
-Band 4: PSNR=13.34 dB | SSIM=0.6154 | Entropy=5.56
-Band 5: PSNR=9.35 dB | SSIM=0.3458 | Entropy=4.84
-Band 6: PSNR=8.80 dB | SSIM=0.1831 | Entropy=4.57
-Band 7: PSNR=7.11 dB | SSIM=0.0802 | Entropy=3.70
-Band 8: PSNR=6.81 dB | SSIM=0.0212 | Entropy=2.62
+| Band | PSNR (dB) | SSIM | Entropy |
+| --- | ---: | ---: | ---: |
+| 1 | 21.26 | 0.8517 | 5.88 |
+| 2 | 24.06 | 0.7655 | 5.58 |
+| 3 | 17.70 | 0.6717 | 5.52 |
+| 4 | 13.34 | 0.6154 | 5.56 |
+| 5 | 9.35 | 0.3458 | 4.84 |
+| 6 | 8.80 | 0.1831 | 4.57 |
+| 7 | 7.11 | 0.0802 | 3.70 |
+| 8 | 6.81 | 0.0212 | 2.62 |
 
-=> Với mục đích để trực quan ảnh (Xem ảnh) thì việc các band RGB giữ được nhiều thông tin là mục đích hướng đến
+Kết luận: với mục tiêu trực quan hóa ảnh RGB, phương pháp percentile cho khả năng giữ thông tin thị giác tốt hơn trong bối cảnh dữ liệu có nhiều outlier
