@@ -168,4 +168,4 @@ Band 6: PSNR=8.80 dB | SSIM=0.1831 | Entropy=4.57
 Band 7: PSNR=7.11 dB | SSIM=0.0802 | Entropy=3.70
 Band 8: PSNR=6.81 dB | SSIM=0.0212 | Entropy=2.62
 
-=> Với mục đích để trực quan ảnh (Xem ảnh) thì việc các band RGB giữ được nhiều thông tin là dấu hiệu tốt
+=> Với mục đích để trực quan ảnh (Xem ảnh) thì việc các band RGB giữ được nhiều thông tin là mục đích hướng đến
