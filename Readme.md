@@ -55,6 +55,8 @@ Tuy vậy, ta sẽ gặp các trường hợp như sau khi normalization pixel
 ---
 
 ## 3. Phân tích histogram và đặc điểm dữ liệu
+![Histogram from QGIS](./histogram.jpg)
+
 ![Histogram per band](./image.png)
 Dựa vào biểu đồ histogram:
 
